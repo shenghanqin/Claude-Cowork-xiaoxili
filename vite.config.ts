@@ -5,7 +5,7 @@ import tsconfigPaths from 'vite-tsconfig-paths';
 
 export default defineConfig(({ mode }) => {
 	const env = loadEnv(mode, process.cwd(), '');
-	const port = parseInt(env.PORT); // MUST BE LOWERCASE
+	const port = env.PORT ? parseInt(env.PORT) : 10087; // 默认使用 10087
 
 	return {
 		plugins: [react(), tailwindcss(), tsconfigPaths()],

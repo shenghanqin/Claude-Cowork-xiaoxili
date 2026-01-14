@@ -15,6 +15,8 @@ app.on("ready", () => {
         minHeight: 600,
         webPreferences: {
             preload: getPreloadPath(),
+            nodeIntegration: false,
+            contextIsolation: true,
         },
         icon: getIconPath(),
         titleBarStyle: "hiddenInset",
@@ -22,8 +24,13 @@ app.on("ready", () => {
         trafficLightPosition: { x: 15, y: 18 }
     });
 
-    if (isDev()) mainWindow.loadURL(`http://localhost:${PORT}`)
-    else mainWindow.loadFile(getUIPath());
+    if (isDev()) {
+        mainWindow.loadURL(`http://localhost:${PORT}`)
+        // 开发模式下自动打开 DevTools
+        mainWindow.webContents.openDevTools();
+    } else {
+        mainWindow.loadFile(getUIPath());
+    }
 
     pollResources(mainWindow);
 
