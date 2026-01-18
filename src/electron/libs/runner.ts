@@ -37,8 +37,11 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
   // Start the query in the background
   (async () => {
     try {
+      // 在 prompt 前添加中文回复要求，确保 Claude 使用中文回复
+      const promptWithLanguage = `请使用中文回复。\n\n${prompt}`;
+      
       const q = query({
-        prompt,
+        prompt: promptWithLanguage,
         options: {
           cwd: session.cwd ?? DEFAULT_CWD,
           resume: resumeSessionId,
