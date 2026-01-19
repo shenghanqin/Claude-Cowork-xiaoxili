@@ -2,6 +2,10 @@ import { query, type SDKMessage, type PermissionResult } from "@anthropic-ai/cla
 import type { ServerEvent } from "../types.js";
 import type { Session } from "./session-store.js";
 
+import { getCurrentApiConfig, buildEnvForConfig } from "./claude-settings.js";
+import { getClaudeCodePath, enhancedEnv} from "./util.js";
+
+
 export type RunnerOptions = {
   prompt: string;
   session: Session;
@@ -15,6 +19,7 @@ export type RunnerHandle = {
 };
 
 const DEFAULT_CWD = process.cwd();
+
 
 export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
   const { prompt, session, resumeSessionId, onEvent, onSessionUpdate } = options;
@@ -40,13 +45,24 @@ export async function runClaude(options: RunnerOptions): Promise<RunnerHandle> {
       // 在 prompt 前添加中文回复要求，确保 Claude 使用中文回复
       const promptWithLanguage = `请使用中文回复。\n\n${prompt}`;
       
+      // 获取当前配置
+      const config = getCurrentApiConfig();
+      
+      // 使用 Anthropic SDK
+      const env = buildEnvForConfig(config);
+      const mergedEnv = {
+        ...enhancedEnv,
+        ...env
+      };
+
       const q = query({
         prompt: promptWithLanguage,
         options: {
           cwd: session.cwd ?? DEFAULT_CWD,
           resume: resumeSessionId,
           abortController,
-          env: { ...process.env },
+          env: mergedEnv,
+          pathToClaudeCodeExecutable: getClaudeCodePath(),
           permissionMode: "bypassPermissions",
           includePartialMessages: true,
           allowDangerouslySkipPermissions: true,

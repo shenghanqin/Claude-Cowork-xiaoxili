@@ -6,14 +6,32 @@ import { ipcWebContentsSend } from "./util.js";
 
 const POLLING_INTERVAL = 500;
 
-export function pollResources(mainWindow: BrowserWindow) {
-    setInterval(async () => {
+let pollingIntervalId: ReturnType<typeof setInterval> | null = null;
+
+export function pollResources(mainWindow: BrowserWindow): void {
+    pollingIntervalId = setInterval(async () => {
+        if (mainWindow.isDestroyed()) {
+            stopPolling();
+            return;
+        }
         const cpuUsage = await getCPUUsage();
         const storageData = getStorageData();
         const ramUsage = getRamUsage();
 
+        if (mainWindow.isDestroyed()) {
+            stopPolling();
+            return;
+        }
+
         ipcWebContentsSend("statistics", mainWindow.webContents, { cpuUsage, ramUsage, storageData: storageData.usage });
     }, POLLING_INTERVAL);
+}
+
+export function stopPolling(): void {
+    if (pollingIntervalId) {
+        clearInterval(pollingIntervalId);
+        pollingIntervalId = null;
+    }
 }
 
 export function getStaticData() {
