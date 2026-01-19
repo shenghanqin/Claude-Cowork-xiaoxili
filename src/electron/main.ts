@@ -57,8 +57,8 @@ app.on("ready", () => {
 
     // Create main window
     mainWindow = new BrowserWindow({
-        width: 1200,
-        height: 800,
+        width: 1600,
+        height: 1000,
         minWidth: 900,
         minHeight: 600,
         webPreferences: {
