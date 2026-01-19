@@ -1,0 +1,9 @@
+{
+  "extends": "../electron/tsconfig.json",
+  "compilerOptions": {
+    "outDir": "../../dist-agent-host",
+    "rootDir": "../.."
+  },
+  "include": ["./**/*", "../electron/libs/**/*", "../electron/types.ts", "../electron/util.ts"],
+  "exclude": ["node_modules", "../electron/main.ts", "../electron/preload.cts", "../electron/pathResolver.ts", "../electron/test.ts", "../electron/ipc-handlers.ts"]
+}
