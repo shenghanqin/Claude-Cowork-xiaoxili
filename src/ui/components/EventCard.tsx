@@ -330,7 +330,7 @@ const SystemInfoCard = ({ message, showIndicator = false }: { message: SDKMessag
   );
 };
 
-const UserMessageCard = ({ message, showIndicator = false }: { message: { type: "user_prompt"; prompt: string }; showIndicator?: boolean }) => {
+const UserMessageCard = ({ message }: { message: { type: "user_prompt"; prompt: string } }) => {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -396,7 +396,7 @@ export function MessageCard({
   const showIndicator = isLast && isRunning;
 
   if (message.type === "user_prompt") {
-    return <UserMessageCard message={message} showIndicator={showIndicator} />;
+    return <UserMessageCard message={message} />;
   }
 
   const sdkMessage = message as SDKMessage;
