@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import * as Dialog from "@radix-ui/react-dialog";
+import * as Tooltip from "@radix-ui/react-tooltip";
 import { useAppStore } from "../store/useAppStore";
 
 interface SidebarProps {
@@ -112,7 +113,26 @@ export function Sidebar({
                   {session.title}
                 </div>
                 <div className="flex items-center justify-between mt-0.5 text-xs text-muted">
-                  <span className="truncate">{formatCwd(session.cwd)}</span>
+                  {session.cwd ? (
+                    <Tooltip.Provider delayDuration={300}>
+                      <Tooltip.Root>
+                        <Tooltip.Trigger asChild>
+                          <span className="truncate cursor-help">{formatCwd(session.cwd)}</span>
+                        </Tooltip.Trigger>
+                        <Tooltip.Portal>
+                          <Tooltip.Content
+                            className="z-50 max-w-xs rounded-lg border border-ink-900/10 bg-ink-900 px-3 py-2 text-xs text-white shadow-lg"
+                            sideOffset={5}
+                          >
+                            {session.cwd}
+                            <Tooltip.Arrow className="fill-ink-900" />
+                          </Tooltip.Content>
+                        </Tooltip.Portal>
+                      </Tooltip.Root>
+                    </Tooltip.Provider>
+                  ) : (
+                    <span className="truncate">Working dir unavailable</span>
+                  )}
                 </div>
               </div>
               <DropdownMenu.Root>

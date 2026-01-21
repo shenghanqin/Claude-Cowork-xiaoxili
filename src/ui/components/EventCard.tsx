@@ -10,6 +10,7 @@ import type { StreamMessage } from "../types";
 import type { PermissionRequest } from "../store/useAppStore";
 import MDContent from "../render/markdown";
 import { DecisionPanel } from "./DecisionPanel";
+import { BashWidget } from "./BashWidget";
 
 type MessageContent = SDKAssistantMessage["message"]["content"][number];
 type ToolResultContent = SDKUserMessage["message"]["content"][number];
@@ -104,7 +105,7 @@ function extractTagContent(input: string, tag: string): string | null {
   return match ? match[1] : null;
 }
 
-const ToolResult = ({ messageContent }: { messageContent: ToolResultContent }) => {
+const ToolResult = ({ messageContent, allMessages = [] }: { messageContent: ToolResultContent; allMessages?: StreamMessage[] }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const isFirstRender = useRef(true);
@@ -113,6 +114,20 @@ const ToolResult = ({ messageContent }: { messageContent: ToolResultContent }) =
   if (messageContent.type !== "tool_result") return null;
   
   const toolUseId = messageContent.tool_use_id;
+  
+  // Check if this is a Bash command result - if so, don't render here (BashWidget handles it)
+  for (const msg of allMessages) {
+    if (msg.type === "assistant") {
+      const sdkMsg = msg as SDKAssistantMessage;
+      const contents = sdkMsg.message.content;
+      for (const content of contents) {
+        if (content.type === "tool_use" && content.id === toolUseId && content.name === "Bash") {
+          return null; // BashWidget will handle this
+        }
+      }
+    }
+  }
+  
   const status: ToolStatus = messageContent.is_error ? "error" : "success";
   const isError = messageContent.is_error;
 
@@ -167,7 +182,15 @@ const AssistantBlockCard = ({ title, text, showIndicator = false }: { title: str
   </div>
 );
 
-const ToolUseCard = ({ messageContent, showIndicator = false }: { messageContent: MessageContent; showIndicator?: boolean }) => {
+const ToolUseCard = ({ 
+  messageContent, 
+  showIndicator = false,
+  allMessages = []
+}: { 
+  messageContent: MessageContent; 
+  showIndicator?: boolean;
+  allMessages?: StreamMessage[];
+}) => {
   if (messageContent.type !== "tool_use") return null;
   
   const toolStatus = useToolStatus(messageContent.id);
@@ -179,10 +202,44 @@ const ToolUseCard = ({ messageContent, showIndicator = false }: { messageContent
     if (messageContent?.id && !toolStatusMap.has(messageContent.id)) setToolStatus(messageContent.id, "pending");
   }, [messageContent?.id]);
 
+  // For Bash commands, use BashWidget
+  if (messageContent.name === "Bash") {
+    const input = messageContent.input as Record<string, any>;
+    const command = input?.command || "";
+    
+    // Find corresponding tool_result
+    let toolResult: any = null;
+    for (const msg of allMessages) {
+      if (msg.type === "user") {
+        const sdkMsg = msg as SDKUserMessage;
+        const contents = sdkMsg.message.content;
+        for (const content of contents) {
+          if (content.type === "tool_result" && content.tool_use_id === messageContent.id) {
+            toolResult = {
+              is_error: content.is_error,
+              content: content.content
+            };
+            break;
+          }
+        }
+        if (toolResult) break;
+      }
+    }
+
+    return (
+      <div className="mt-4">
+        <BashWidget
+          command={command}
+          result={toolResult}
+          isRunning={isPending && showIndicator}
+        />
+      </div>
+    );
+  }
+
   const getToolInfo = (): string | null => {
     const input = messageContent.input as Record<string, any>;
     switch (messageContent.name) {
-      case "Bash": return input?.command || null;
       case "Read": case "Write": case "Edit": return input?.file_path || null;
       case "Glob": case "Grep": return input?.pattern || null;
       case "Task": return input?.description || null;
@@ -273,28 +330,68 @@ const SystemInfoCard = ({ message, showIndicator = false }: { message: SDKMessag
   );
 };
 
-const UserMessageCard = ({ message, showIndicator = false }: { message: { type: "user_prompt"; prompt: string }; showIndicator?: boolean }) => (
-  <div className="flex flex-col mt-4">
-    <div className="header text-accent flex items-center gap-2">
-      <StatusDot variant="success" isActive={showIndicator} isVisible={showIndicator} />
-      User
+const UserMessageCard = ({ message, showIndicator = false }: { message: { type: "user_prompt"; prompt: string }; showIndicator?: boolean }) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    if (message.prompt) {
+      try {
+        await navigator.clipboard.writeText(message.prompt);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch (error) {
+        console.error('Failed to copy:', error);
+      }
+    }
+  };
+
+  return (
+    <div className="flex justify-end w-full group py-2">
+      <div className="max-w-[80%] flex flex-col items-end gap-1.5 overflow-hidden">
+        {/* 用户消息气泡 - 右侧显示 */}
+        <div className="rounded-2xl rounded-br-sm px-4 py-2.5 transition-colors overflow-hidden w-full bg-surface-secondary border border-ink-900/10 shadow-sm">
+          <div className="text-sm whitespace-pre-wrap break-words">
+            <MDContent text={message.prompt} />
+          </div>
+        </div>
+        {/* 复制按钮 - hover 时在消息下方显示 */}
+        {message.prompt && (
+          <button
+            onClick={handleCopy}
+            className="p-1 rounded transition-colors opacity-0 group-hover:opacity-100 hover:bg-surface-tertiary text-muted hover:text-ink-700 cursor-pointer"
+            title={copied ? '已复制' : '复制'}
+          >
+            {copied ? (
+              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-success" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M5 12l4 4L19 6" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <rect x="9" y="9" width="11" height="11" rx="2" />
+                <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+              </svg>
+            )}
+          </button>
+        )}
+      </div>
     </div>
-    <MDContent text={message.prompt} />
-  </div>
-);
+  );
+};
 
 export function MessageCard({
   message,
   isLast = false,
   isRunning = false,
   permissionRequest,
-  onPermissionResult
+  onPermissionResult,
+  allMessages = []
 }: {
   message: StreamMessage;
   isLast?: boolean;
   isRunning?: boolean;
   permissionRequest?: PermissionRequest;
   onPermissionResult?: (toolUseId: string, result: PermissionResult) => void;
+  allMessages?: StreamMessage[];
 }) {
   const showIndicator = isLast && isRunning;
 
@@ -338,7 +435,7 @@ export function MessageCard({
             if (content.name === "AskUserQuestion") {
               return <AskUserQuestionCard key={idx} messageContent={content} permissionRequest={permissionRequest} onPermissionResult={onPermissionResult} />;
             }
-            return <ToolUseCard key={idx} messageContent={content} showIndicator={isLastContent && showIndicator} />;
+            return <ToolUseCard key={idx} messageContent={content} showIndicator={isLastContent && showIndicator} allMessages={allMessages} />;
           }
           return null;
         })}
@@ -352,7 +449,7 @@ export function MessageCard({
       <>
         {contents.map((content: ToolResultContent, idx: number) => {
           if (content.type === "tool_result") {
-            return <ToolResult key={idx} messageContent={content} />;
+            return <ToolResult key={idx} messageContent={content} allMessages={allMessages} />;
           }
           return null;
         })}

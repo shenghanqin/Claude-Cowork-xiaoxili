@@ -302,6 +302,7 @@ function App() {
                   isRunning={isRunning}
                   permissionRequest={permissionRequests[0]}
                   onPermissionResult={handlePermissionResult}
+                  allMessages={messages}
                 />
               ))
             )}
